@@ -50,6 +50,7 @@ def find_file(path, saltenv='base', **kwargs):
            'rel': ''}
     if os.path.isabs(path):
         return fnd
+    requested_saltenv = saltenv
     if saltenv not in __opts__['file_roots']:
         if '__env__' in __opts__['file_roots']:
             log.debug("salt environment '%s' maps to __env__ file_roots directory", saltenv)
@@ -85,6 +86,9 @@ def find_file(path, saltenv='base', **kwargs):
     if 'index' in kwargs:
         try:
             root = __opts__['file_roots'][saltenv][int(kwargs['index'])]
+            if isinstance(root, dict):
+                # get dict's first key like when this is a list entry.
+                root = root.keys()[0]
         except IndexError:
             # An invalid index was passed
             return fnd
@@ -95,14 +99,35 @@ def find_file(path, saltenv='base', **kwargs):
         if os.path.isfile(full) and not salt.fileserver.is_file_ignored(__opts__, full):
             fnd['path'] = full
             fnd['rel'] = path
+            log.debug("file_roots path %s found: %s", path,full)
             return _add_file_stat(fnd)
         return fnd
-    for root in __opts__['file_roots'][saltenv]:
+
+    for item in __opts__['file_roots'][saltenv]:
+        if isinstance(item, dict):
+            # get dict's first key like when this is a list entry.
+            root = item.keys()[0]
+            append_saltenv = item[root].get('append_saltenv')
+            if append_saltenv:
+                # append requested saltenv to root directory.
+                log.debug("file_roots append_saltenv: %s", append_saltenv)
+                root = os.path.join(root,
+                    requested_saltenv if isinstance(append_saltenv, bool)
+                        # format string in append_saltenv
+                        else append_saltenv % requested_saltenv
+                )
+                log.debug("file_roots path append with saltenv to %s", root)
+        else: # item is a list entry
+            root = item
         full = os.path.join(root, path)
+
         if os.path.isfile(full) and not salt.fileserver.is_file_ignored(__opts__, full):
             fnd['path'] = full
             fnd['rel'] = path
+            log.debug("file_roots path %s found: %s", path,full)
             return _add_file_stat(fnd)
+    log.debug("file_roots path %s NOT found", path)
+
     return fnd
 
 
@@ -160,9 +185,17 @@ def update():
             'backend': 'roots'}
 
     # generate the new map
-    new_mtime_map = salt.fileserver.generate_mtime_map(__opts__, __opts__['file_roots'])
+    new_mtime_map = salt.fileserver.generate_mtime_map(__opts__,
+        # flatten dicts in list of paths in file_root to just the first key.
+        {
+            env: [p.keys()[0] if isinstance(p,dict) else p
+                    for p in paths]
+                        for env,paths in __opts__['file_roots'].items()
+        }
+    )
 
     old_mtime_map = {}
+
     # if you have an old map, load that
     if os.path.exists(mtime_map_path):
         with salt.utils.files.fopen(mtime_map_path, 'rb') as fp_:
@@ -404,6 +437,8 @@ def _file_lists(load, form):
                         ret['links'][rel_path] = link_dest
 
         for path in __opts__['file_roots'][saltenv]:
+            if isinstance(path, dict):
+                path = path.keys()[0]
             for root, dirs, files in salt.utils.path.os_walk(
                     path,
                     followlinks=__opts__['fileserver_followsymlinks']):
