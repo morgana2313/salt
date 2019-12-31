@@ -816,7 +816,22 @@ class PillarClient(Client):
         if salt.utils.url.is_escaped(path):
             # The path arguments are escaped
             path = salt.utils.url.unescape(path)
-        for root in self.opts['pillar_roots'].get(saltenv, []):
+        for item in self.opts['pillar_roots'].get(saltenv, []):
+            if isinstance(item, dict):
+                # get dict's first key like when this is a list entry.
+                root = item.keys()[0]
+                append_saltenv = item[root].get('append_saltenv')
+                if append_saltenv:
+                    # append requested saltenv path to root
+                    root = os.path.join(root,
+                        saltenv if isinstance(append_saltenv, bool)
+                                # replace __env__ with saltenv and append to root
+                                else append_saltenv.replace("__env__", saltenv)
+                    )
+                    log.debug("PillarClient: pillar_roots path append with saltenv to %s", root)
+            else: # item is a list entry
+                root = item
+
             full = os.path.join(root, path)
             if os.path.isfile(full):
                 fnd['path'] = full
@@ -851,6 +866,8 @@ class PillarClient(Client):
         ret = []
         prefix = prefix.strip('/')
         for path in self.opts['pillar_roots'].get(saltenv, []):
+            if isinstance(path, dict):
+                path = path.keys()[0]
             for root, dirs, files in salt.utils.path.os_walk(
                 os.path.join(path, prefix), followlinks=True
             ):
@@ -869,6 +886,8 @@ class PillarClient(Client):
         ret = []
         prefix = prefix.strip('/')
         for path in self.opts['pillar_roots'].get(saltenv, []):
+            if isinstance(path, dict):
+                path = path.keys()[0]
             for root, dirs, files in salt.utils.path.os_walk(
                 os.path.join(path, prefix), followlinks=True
             ):
@@ -886,6 +905,8 @@ class PillarClient(Client):
         ret = []
         prefix = prefix.strip('/')
         for path in self.opts['pillar_roots'].get(saltenv, []):
+            if isinstance(path, dict):
+                path = path.keys()[0]
             for root, dirs, files in salt.utils.path.os_walk(
                 os.path.join(path, prefix), followlinks=True
             ):

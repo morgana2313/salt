@@ -488,6 +488,7 @@ class Pillar(object):
             env = opts.get('pillarenv') or opts.get('saltenv') or 'base'
             if env not in opts['pillar_roots']:
                 log.debug("pillar environment '%s' maps to __env__ pillar_roots directory", env)
+                # remove __env__ and add requested environment
                 opts['pillar_roots'][env] = opts['pillar_roots'].pop('__env__')
             else:
                 log.debug("pillar_roots __env__ ignored (environment '%s' found in pillar_roots)",

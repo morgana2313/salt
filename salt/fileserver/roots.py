@@ -112,9 +112,10 @@ def find_file(path, saltenv='base', **kwargs):
                 # append requested saltenv to root directory.
                 log.debug("file_roots append_saltenv: %s", append_saltenv)
                 root = os.path.join(root,
-                    requested_saltenv if isinstance(append_saltenv, bool)
-                        # format string in append_saltenv
-                        else append_saltenv % requested_saltenv
+                    requested_saltenv \
+                        if isinstance(append_saltenv, bool)
+                        # replace __env__ with saltenv and append to root
+                        else append_saltenv.replace("__env__", requested_saltenv)
                 )
                 log.debug("file_roots path append with saltenv to %s", root)
         else: # item is a list entry
