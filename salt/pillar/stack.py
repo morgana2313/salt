@@ -402,15 +402,24 @@ def ext_pillar(minion_id, pillar, *args, **kwargs):
         'grains': functools.partial(salt.utils.data.traverse_dict_and_list, __grains__),
         'opts': functools.partial(salt.utils.data.traverse_dict_and_list, __opts__),
         }
+    pillarenv = kwargs.pop('pillarenv','base')
     for matcher, matchs in six.iteritems(kwargs):
-        t, matcher = matcher.split(':', 1)
-        if t not in traverse:
-            raise Exception('Unknown traverse option "{0}", '
-                            'should be one of {1}'.format(t, traverse.keys()))
-        cfgs = matchs.get(traverse[t](matcher, None), [])
+        if matcher == 'environment':
+            if pillarenv in matchs:
+                cfgs = matchs.get(pillarenv,[])
+            elif '__env__' in matchs:
+                cfgs = matchs.get('__env__',[])
+        else:
+            t, matcher = matcher.split(':', 1)
+            if t not in traverse:
+                raise Exception('Unknown traverse option "{0}", '
+                                'should be one of {1}'.format(t, traverse.keys()))
+            cfgs = matchs.get(traverse[t](matcher, None), [])
         if not isinstance(cfgs, list):
             cfgs = [cfgs]
         stack_config_files += cfgs
+
+    stack_config_files = [c.replace("__env__", pillarenv) for c in stack_config_files]
     for cfg in stack_config_files:
         if not os.path.isfile(cfg):
             log.info(

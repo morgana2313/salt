@@ -897,29 +897,31 @@ class Pillar(object):
             if ('extra_minion_data' in args) and self.extra_minion_data:
                 ext = self.ext_pillars[key](
                     self.minion_id, pillar,
-                    extra_minion_data=self.extra_minion_data, **val)
+                    extra_minion_data=self.extra_minion_data,
+                    pillarenv = self.opts.get('pillarenv','base'), **val)
             else:
-                ext = self.ext_pillars[key](self.minion_id, pillar, **val)
+                ext = self.ext_pillars[key](self.minion_id, pillar,
+                        pillarenv = self.opts.get('pillarenv','base'), **val)
         elif isinstance(val, list):
             if ('extra_minion_data' in args) and self.extra_minion_data:
                 ext = self.ext_pillars[key](
                     self.minion_id, pillar, *val,
-                    extra_minion_data=self.extra_minion_data)
+                    extra_minion_data=self.extra_minion_data,
+                    pillarenv = self.opts.get('pillarenv','base'))
             else:
                 ext = self.ext_pillars[key](self.minion_id,
-                                            pillar,
-                                            *val)
+                    pillar,*val,pillarenv = self.opts.get('pillarenv','base'))
         else:
             if ('extra_minion_data' in args) and self.extra_minion_data:
                 ext = self.ext_pillars[key](
                     self.minion_id,
                     pillar,
                     val,
-                    extra_minion_data=self.extra_minion_data)
+                    extra_minion_data=self.extra_minion_data,
+                    pillarenv = self.opts.get('pillarenv','base'))
             else:
                 ext = self.ext_pillars[key](self.minion_id,
-                                            pillar,
-                                            val)
+                    pillar,val,pillarenv = self.opts.get('pillarenv','base'))
         return ext
 
     def ext_pillar(self, pillar, errors=None):
