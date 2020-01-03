@@ -33,8 +33,10 @@ import salt.utils.platform
 import salt.utils.stringutils
 import salt.utils.versions
 from salt.ext import six
+import fnmatch
 
 log = logging.getLogger(__name__)
+
 
 
 def find_file(path, saltenv='base', **kwargs):
@@ -50,13 +52,11 @@ def find_file(path, saltenv='base', **kwargs):
            'rel': ''}
     if os.path.isabs(path):
         return fnd
-    requested_saltenv = saltenv
-    if saltenv not in __opts__['file_roots']:
-        if '__env__' in __opts__['file_roots']:
-            log.debug("salt environment '%s' maps to __env__ file_roots directory", saltenv)
-            saltenv = '__env__'
-        else:
-            return fnd
+
+    glob_envs = globgrep_environments(__opts__['file_roots'].keys(),saltenv)
+
+    if not glob_envs:
+        return fnd
 
     def _add_file_stat(fnd):
         '''
@@ -86,9 +86,6 @@ def find_file(path, saltenv='base', **kwargs):
     if 'index' in kwargs:
         try:
             root = __opts__['file_roots'][saltenv][int(kwargs['index'])]
-            if isinstance(root, dict):
-                # get dict's first key like when this is a list entry.
-                root = root.keys()[0]
         except IndexError:
             # An invalid index was passed
             return fnd
@@ -103,32 +100,18 @@ def find_file(path, saltenv='base', **kwargs):
             return _add_file_stat(fnd)
         return fnd
 
-    for item in __opts__['file_roots'][saltenv]:
-        if isinstance(item, dict):
-            # get dict's first key like when this is a list entry.
-            root = item.keys()[0]
-            append_saltenv = item[root].get('append_saltenv')
-            if append_saltenv:
-                # append requested saltenv to root directory.
-                log.debug("file_roots append_saltenv: %s", append_saltenv)
-                root = os.path.join(root,
-                    requested_saltenv \
-                        if isinstance(append_saltenv, bool)
-                        # replace __env__ with saltenv and append to root
-                        else append_saltenv.replace("__env__", requested_saltenv)
-                )
-                log.debug("file_roots path append with saltenv to %s", root)
-        else: # item is a list entry
-            root = item
-        full = os.path.join(root, path)
-
-        if os.path.isfile(full) and not salt.fileserver.is_file_ignored(__opts__, full):
-            fnd['path'] = full
-            fnd['rel'] = path
-            log.debug("file_roots path %s found: %s", path,full)
-            return _add_file_stat(fnd)
-    log.debug("file_roots path %s NOT found", path)
-
+    for glob_env in glob_envs:
+        for root in __opts__['file_roots'][glob_env]:
+            root = root.replace("__env__", saltenv)
+            log.debug("JRK file_roots root=%s",root)
+            full = os.path.join(root, path)
+            if os.path.isfile(full) and not salt.fileserver.is_file_ignored(__opts__, full):
+                fnd['path'] = full
+                fnd['rel'] = path
+                log.debug("JRK file_roots path %s found: %s", path,full)
+                return _add_file_stat(fnd)
+            else:
+                log.debug("JRK file_roots path %s NOT found", full)
     return fnd
 
 
@@ -186,14 +169,7 @@ def update():
             'backend': 'roots'}
 
     # generate the new map
-    new_mtime_map = salt.fileserver.generate_mtime_map(__opts__,
-        # flatten dicts in list of paths in file_root to just the first key.
-        {
-            env: [p.keys()[0] if isinstance(p,dict) else p
-                    for p in paths]
-                        for env,paths in __opts__['file_roots'].items()
-        }
-    )
+    new_mtime_map = salt.fileserver.generate_mtime_map(__opts__, __opts__['file_roots'])
 
     old_mtime_map = {}
 
@@ -260,8 +236,6 @@ def file_hash(load, fnd):
         return ''
     path = fnd['path']
     saltenv = load['saltenv']
-    if saltenv not in __opts__['file_roots'] and '__env__' in __opts__['file_roots']:
-        saltenv = '__env__'
     ret = {}
 
     # if the file doesn't exist, we can't get a hash
@@ -336,11 +310,10 @@ def _file_lists(load, form):
         load.pop('env')
 
     saltenv = load['saltenv']
-    if saltenv not in __opts__['file_roots']:
-        if '__env__' in __opts__['file_roots']:
-            log.debug("salt environment '%s' maps to __env__ file_roots directory", saltenv)
-            saltenv = '__env__'
-        else:
+
+    glob_envs = globgrep_environments(__opts__['file_roots'].keys(),saltenv)
+
+    if not glob_envs:
             return []
 
     list_cachedir = os.path.join(__opts__['cachedir'], 'file_lists', 'roots')
@@ -437,14 +410,13 @@ def _file_lists(load, form):
                         # (i.e. the "path" variable)
                         ret['links'][rel_path] = link_dest
 
-        for path in __opts__['file_roots'][saltenv]:
-            if isinstance(path, dict):
-                path = path.keys()[0]
-            for root, dirs, files in salt.utils.path.os_walk(
-                    path,
-                    followlinks=__opts__['fileserver_followsymlinks']):
-                _add_to(ret['dirs'], path, root, dirs)
-                _add_to(ret['files'], path, root, files)
+        for glob_env in glob_envs:
+            for path in __opts__['file_roots'][glob_env]:
+                for root, dirs, files in salt.utils.path.os_walk(
+                        path,
+                        followlinks=__opts__['fileserver_followsymlinks']):
+                    _add_to(ret['dirs'], path, root, dirs)
+                    _add_to(ret['files'], path, root, files)
 
         ret['files'] = sorted(ret['files'])
         ret['dirs'] = sorted(ret['dirs'])
@@ -494,7 +466,7 @@ def symlink_list(load):
         load.pop('env')
 
     ret = {}
-    if load['saltenv'] not in __opts__['file_roots'] and '__env__' not in __opts__['file_roots']:
+    if not globgrep_environments(__opts__['file_roots'].keys(),load['saltenv']):
         return ret
 
     if 'prefix' in load:
@@ -506,3 +478,8 @@ def symlink_list(load):
     return dict([(key, val)
                  for key, val in six.iteritems(symlinks)
                  if key.startswith(prefix)])
+
+def globgrep_environments(glob_environments,saltenv):
+    # glob-style wildcard matching on environments, __env__ backwards compatibility.
+    return [glob_env for glob_env in glob_environments
+                if fnmatch.fnmatch(saltenv,glob_env) or saltenv == '__env__']
