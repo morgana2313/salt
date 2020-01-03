@@ -33,7 +33,6 @@ import salt.utils.platform
 import salt.utils.stringutils
 import salt.utils.versions
 from salt.ext import six
-import fnmatch
 
 from salt.fileclient import globgrep_environments
 
