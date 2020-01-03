@@ -14,6 +14,7 @@ import shutil
 import ftplib
 from tornado.httputil import parse_response_start_line, HTTPHeaders, HTTPInputError
 import salt.utils.atomicfile
+import fnmatch
 
 # Import salt libs
 from salt.exceptions import (
@@ -1431,3 +1432,8 @@ class DumbAuth(object):
     '''
     def gen_token(self, clear_tok):
         return clear_tok
+
+def globgrep_environments(glob_environments,saltenv):
+    # glob-style wildcard matching on environments, __env__ for backwards compatibility.
+    return [glob_env for glob_env in glob_environments
+                if fnmatch.fnmatch(saltenv,glob_env) or saltenv == '__env__']

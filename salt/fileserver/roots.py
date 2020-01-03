@@ -35,9 +35,9 @@ import salt.utils.versions
 from salt.ext import six
 import fnmatch
 
+from salt.fileclient import globgrep_environments
+
 log = logging.getLogger(__name__)
-
-
 
 def find_file(path, saltenv='base', **kwargs):
     '''
@@ -478,8 +478,3 @@ def symlink_list(load):
     return dict([(key, val)
                  for key, val in six.iteritems(symlinks)
                  if key.startswith(prefix)])
-
-def globgrep_environments(glob_environments,saltenv):
-    # glob-style wildcard matching on environments, __env__ backwards compatibility.
-    return [glob_env for glob_env in glob_environments
-                if fnmatch.fnmatch(saltenv,glob_env) or saltenv == '__env__']
