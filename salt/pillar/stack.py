@@ -548,6 +548,6 @@ def _parse_stack_cfg(content):
         obj = salt.utils.yaml.safe_load(content)
         if isinstance(obj, list):
             return obj
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         pass
     return content.splitlines()
