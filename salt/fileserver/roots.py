@@ -33,7 +33,6 @@ import salt.utils.platform
 import salt.utils.stringutils
 import salt.utils.versions
 from salt.ext import six
-
 from salt.fileclient import globgrep_environments
 
 log = logging.getLogger(__name__)
@@ -53,7 +52,6 @@ def find_file(path, saltenv='base', **kwargs):
         return fnd
 
     glob_envs = globgrep_environments(__opts__['file_roots'].keys(),saltenv)
-
     if not glob_envs:
         return fnd
 
@@ -95,22 +93,18 @@ def find_file(path, saltenv='base', **kwargs):
         if os.path.isfile(full) and not salt.fileserver.is_file_ignored(__opts__, full):
             fnd['path'] = full
             fnd['rel'] = path
-            log.debug("file_roots path %s found: %s", path,full)
             return _add_file_stat(fnd)
         return fnd
 
     for glob_env in glob_envs:
-        for root in __opts__['file_roots'][glob_env]: # JRK TODO: functie die beide loops combineert?
+        for root in __opts__['file_roots'][glob_env]:
             root = root.replace("__env__", saltenv)
-            log.debug("JRK file_roots root=%s",root)
             full = os.path.join(root, path)
             if os.path.isfile(full) and not salt.fileserver.is_file_ignored(__opts__, full):
                 fnd['path'] = full
                 fnd['rel'] = path
-                log.debug("JRK file_roots path %s found: %s", path,full)
                 return _add_file_stat(fnd)
             else:
-                log.debug("JRK file_roots path %s NOT found", full)
     return fnd
 
 
@@ -171,7 +165,6 @@ def update():
     new_mtime_map = salt.fileserver.generate_mtime_map(__opts__, __opts__['file_roots'])
 
     old_mtime_map = {}
-
     # if you have an old map, load that
     if os.path.exists(mtime_map_path):
         with salt.utils.files.fopen(mtime_map_path, 'rb') as fp_:
@@ -309,9 +302,7 @@ def _file_lists(load, form):
         load.pop('env')
 
     saltenv = load['saltenv']
-
     glob_envs = globgrep_environments(__opts__['file_roots'].keys(),saltenv)
-
     if not glob_envs:
             return []
 

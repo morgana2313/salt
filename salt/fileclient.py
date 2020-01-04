@@ -348,9 +348,6 @@ class Client(object):
         '''
         states = set()
         for path in self.file_list(saltenv, requested_env = requested_env):
-            # path = path.replace("__env__", saltenv)
-            log.debug("JRK list_states saltenv: %s path: %s",saltenv,path)
-
             if salt.utils.platform.is_windows():
                 path = path.replace('\\', '/')
             if path.endswith('.sls'):
@@ -359,8 +356,6 @@ class Client(object):
                     states.add(path.replace('/', '.')[:-9])
                 else:
                     states.add(path.replace('/', '.')[:-4])
-        log.debug("JRK list_states saltenv: %s states: %s",saltenv,states)
-
         return sorted(states)
 
     def get_state(self, sls, saltenv, cachedir=None):
@@ -818,34 +813,19 @@ class PillarClient(Client):
         '''
         fnd = {'path': '',
                'rel': ''}
-        log.debug("JRK5 pillar _FIND_FILE path: %s saltenv: %s",path,saltenv)
+
         if salt.utils.url.is_escaped(path):
             # The path arguments are escaped
             path = salt.utils.url.unescape(path)
-# {u'x': [u'/sn/git/codebase/dx/pillar'], u'__env__': [u'/sn/git/codebase/__env__/pillar', u'/sn/junk'], u'm': [u'/sn/git/codebase/master/pillar'], u't': [u'/tmp/__env__/pillar']} saltenv: master
-# JRK5 pillar_roots glob_env=__env__
-# JRK5 pillar_roots full=/sn/git/codebase/master/pillar/top.sls
 
-# {u'x': [u'/sn/git/codebase/dx/pillar'], u'__env__': [u'/sn/git/codebase/__env__/pillar', u'/sn/junk'], u'm': [u'/sn/git/codebase/master/pillar'], u't': [u'/tmp/__env__/pillar']} saltenv: m
-# JRK5 pillar_roots full=/sn/git/codebase/m/pillar/r.sls
-# JRK5 pillar_roots glob_env=__env_
-
-        log.debug("JRK5 pillar _find_file: %s saltenv: %s",self.opts['pillar_roots'],saltenv)
         for glob_env in globgrep_environments(self.opts['pillar_roots'].keys(),saltenv):
-            log.debug("JRK5 pillar _find_file glob_env=%s pillar_roots=%s",glob_env,self.opts['pillar_roots'][glob_env])
-
             for root in self.opts['pillar_roots'][glob_env]:
                 root = root.replace("__env__", saltenv)
                 full = os.path.join(root, path)
-                log.debug("JRK5 pillar _find_file root=%s full=%s",root,full)
-
                 if os.path.isfile(full):
                     fnd['path'] = full
                     fnd['rel'] = path
-                    log.debug("JRK5 pillar _find_file path %s found: %s", path,full)
                     return fnd
-
-        log.debug("JRK5 pillar _find_file path %s NOT found", full)
         return fnd
 
     def get_file(self,
@@ -859,8 +839,6 @@ class PillarClient(Client):
         Copies a file from the local files directory into :param:`dest`
         gzip compression settings are ignored for local files
         '''
-        log.debug("JRK5 pillar GET_FILE path: %s saltenv: %s",path,saltenv)
-
         path = self._check_proto(path)
         fnd = self._find_file(path, saltenv)
         fnd_path = fnd.get('path')
@@ -876,7 +854,6 @@ class PillarClient(Client):
         '''
         ret = []
         prefix = prefix.strip('/')
-        log.debug("JRK file_list saltenv: %s ", saltenv)
         if requested_env is None :
             requested_env = saltenv
 
@@ -884,8 +861,6 @@ class PillarClient(Client):
         for glob_env in globgrep_environments(self.opts['pillar_roots'].keys(),saltenv):
             for path in self.opts['pillar_roots'][glob_env]:
                 path = path.replace("__env__", requested_env)
-#
-                log.debug("JRK file_list saltenv: %s path: %s", saltenv, path) # HIERZO!
                 for root, dirs, files in salt.utils.path.os_walk(
                     os.path.join(path, prefix), followlinks=True
                 ):
@@ -894,8 +869,6 @@ class PillarClient(Client):
                     for fname in files:
                         relpath = os.path.relpath(os.path.join(root, fname), path)
                         ret.append(salt.utils.data.decode(relpath))
-        log.debug("JRK file_list saltenv: %s ret: %s", saltenv, ret)
-
         return ret
 
     def file_list_emptydirs(self, saltenv='base', prefix=''):

@@ -454,7 +454,6 @@ class Pillar(object):
         avail = {}
         for env in self._get_envs():
             avail[env] = self.client.list_states(env, requested_env = self.saltenv)
-        log.debug("JRK __gather_avail: %s",avail)
         return avail
 
     def __gen_opts(self, opts_in, grains, saltenv=None, ext=None, pillarenv=None):
@@ -486,16 +485,6 @@ class Pillar(object):
                 opts['ext_pillar'].append(self.ext)
             else:
                 opts['ext_pillar'] = [self.ext]
-        # if '__env__' in opts['pillar_roots']:
-        #     env = opts.get('pillarenv') or opts.get('saltenv') or 'base'
-        #     if env not in opts['pillar_roots']:
-        #         log.debug("pillar environment '%s' maps to __env__ pillar_roots directory", env)
-        #         # remove __env__ and add requested environment
-        #         opts['pillar_roots'][env] = opts['pillar_roots'].pop('__env__')
-        #     else:
-        #         log.debug("pillar_roots __env__ ignored (environment '%s' found in pillar_roots)",
-        #                   env)
-        #         opts['pillar_roots'].pop('__env__')
         return opts
 
     def _get_envs(self):
@@ -523,7 +512,6 @@ class Pillar(object):
                 # pillar environments, do not cache the pillar top file.
                 glob_envs = globgrep_environments(self.opts['pillar_roots'].keys(),
                     self.opts['pillarenv'])
-
                 if not glob_envs:
                     log.debug(
                         'pillarenv \'%s\' not found in the configured pillar '
@@ -706,7 +694,6 @@ class Pillar(object):
             defaults = {}
         err = ''
         errors = []
-        log.debug("JRK3 render_pstate saltenv=%s sls=%s",saltenv,sls)
         fn_ = self.client.get_state(sls, saltenv).get('dest', False)
         if not fn_:
             if sls in self.ignored_pillars.get(saltenv, []):
@@ -714,12 +701,12 @@ class Pillar(object):
                           'environment \'%s\'', sls, saltenv)
                 return None, mods, errors
             elif self.opts['pillar_roots'].get(saltenv):
-                msg = ('JRK3 Specified SLS \'{0}\' in environment \'{1}\' is not'
+                msg = ('Specified SLS \'{0}\' in environment \'{1}\' is not'
                        ' available on the salt master').format(sls, saltenv)
                 log.error(msg)
                 errors.append(msg)
             else:
-                msg = ('JRK4 Specified SLS \'{0}\' in environment \'{1}\' was not '
+                msg = ('Specified SLS \'{0}\' in environment \'{1}\' was not '
                        'found. '.format(sls, saltenv))
                 if self.opts.get('__git_pillar', False) is True:
                     msg += (
@@ -793,7 +780,7 @@ class Pillar(object):
                                 )
                             except KeyError:
                                 errors.extend(
-                                    ['JRK2 No matching pillar environment for environment '
+                                    ['No matching pillar environment for environment '
                                      '\'{0}\' found'.format(saltenv)]
                                 )
                                 matched_pstates = [sub_sls]
@@ -846,7 +833,6 @@ class Pillar(object):
         Extract the sls pillar files from the matches and render them into the
         pillar
         '''
-        log.debug('JRK1 RENDER_PILLAR')
         pillar = copy.copy(self.pillar_override)
         if errors is None:
             errors = []
@@ -854,22 +840,16 @@ class Pillar(object):
             pstatefiles = []
             mods = set()
             for sls_match in pstates:
-                log.debug("JRK1 render_pillar sls_match: %s", sls_match)
-
                 glob_envs = globgrep_environments(self.opts['pillar_roots'].keys(),saltenv)
                 if not glob_envs:
                     errors.extend(
-                        ['JRK1 No matching pillar environment for environment '
+                        ['No matching pillar environment for environment '
                          '\'{0}\' found in {1}'.format(saltenv,self.avail)]
                     )
-
                 matched_pstates = [
                     fn for glob_env in glob_envs \
                         for fn in fnmatch.filter(self.avail[glob_env], sls_match)
                 ]
-
-                log.debug('JRK1 render_pillar matched_pstates: %s',matched_pstates)
-
                 if matched_pstates:
                     pstatefiles.extend(matched_pstates)
                 else:
