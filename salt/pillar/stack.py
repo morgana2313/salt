@@ -390,6 +390,8 @@ import salt.utils.data
 import salt.utils.jinja
 import salt.utils.yaml
 
+from salt.fileclient import globgrep_environments
+
 log = logging.getLogger(__name__)
 strategies = ('overwrite', 'merge-first', 'merge-last', 'remove')
 
@@ -403,12 +405,28 @@ def ext_pillar(minion_id, pillar, *args, **kwargs):
         'opts': functools.partial(salt.utils.data.traverse_dict_and_list, __opts__),
         }
     pillarenv = kwargs.pop('pillarenv','base')
+    log.debug("JRK7 ext_pillar: pillarenv: %s ",pillarenv)
+
     for matcher, matchs in six.iteritems(kwargs):
+        log.debug("JRK7 ext_pillar: matcher: %s",matcher)
+
         if matcher == 'environment':
-            if pillarenv in matchs:
-                cfgs = matchs.get(pillarenv,[])
-            elif '__env__' in matchs:
-                cfgs = matchs.get('__env__',[])
+            log.debug("JRK7 ext_pillar: matchs: %s",matchs)
+
+            glob_envs = globgrep_environments(matchs,pillarenv)
+            cfgs = []
+            for glob_env in glob_envs:
+                if  isinstance(matchs[glob_env], list):
+                    cfgs += matchs[glob_env]
+                else:
+                    cfgs += [ matchs[glob_env] ]
+                    
+            log.debug("JRK7 cfgs: %s",cfgs)
+
+            # if pillarenv in matchs:
+            #     cfgs = matchs.get(pillarenv,[])
+            # elif '__env__' in matchs:
+            #     cfgs = matchs.get('__env__',[])
         else:
             t, matcher = matcher.split(':', 1)
             if t not in traverse:
@@ -419,7 +437,10 @@ def ext_pillar(minion_id, pillar, *args, **kwargs):
             cfgs = [cfgs]
         stack_config_files += cfgs
 
+    log.debug("JRK7 ext_pillar: stack_config_files1: %s",stack_config_files)
     stack_config_files = [c.replace("__env__", pillarenv) for c in stack_config_files]
+    log.debug("JRK7 ext_pillar: stack_config_files2: %s",stack_config_files)
+
     for cfg in stack_config_files:
         if not os.path.isfile(cfg):
             log.info(

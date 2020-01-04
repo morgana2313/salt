@@ -100,7 +100,7 @@ def find_file(path, saltenv='base', **kwargs):
         return fnd
 
     for glob_env in glob_envs:
-        for root in __opts__['file_roots'][glob_env]:
+        for root in __opts__['file_roots'][glob_env]: # JRK TODO: functie die beide loops combineert?
             root = root.replace("__env__", saltenv)
             log.debug("JRK file_roots root=%s",root)
             full = os.path.join(root, path)

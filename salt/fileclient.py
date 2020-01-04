@@ -341,13 +341,16 @@ class Client(object):
 
         return ''
 
-    def list_states(self, saltenv):
+    def list_states(self, saltenv, requested_env = None):
         '''
         Return a list of all available sls modules on the master for a given
         environment
         '''
         states = set()
-        for path in self.file_list(saltenv):
+        for path in self.file_list(saltenv, requested_env = requested_env):
+            # path = path.replace("__env__", saltenv)
+            log.debug("JRK list_states saltenv: %s path: %s",saltenv,path)
+
             if salt.utils.platform.is_windows():
                 path = path.replace('\\', '/')
             if path.endswith('.sls'):
@@ -356,6 +359,8 @@ class Client(object):
                     states.add(path.replace('/', '.')[:-9])
                 else:
                     states.add(path.replace('/', '.')[:-4])
+        log.debug("JRK list_states saltenv: %s states: %s",saltenv,states)
+
         return sorted(states)
 
     def get_state(self, sls, saltenv, cachedir=None):
@@ -813,31 +818,34 @@ class PillarClient(Client):
         '''
         fnd = {'path': '',
                'rel': ''}
-
+        log.debug("JRK5 pillar _FIND_FILE path: %s saltenv: %s",path,saltenv)
         if salt.utils.url.is_escaped(path):
             # The path arguments are escaped
             path = salt.utils.url.unescape(path)
-        for item in self.opts['pillar_roots'].get(saltenv, []):
-            if isinstance(item, dict):
-                # get dict's first key like when this is a list entry.
-                root = item.keys()[0]
-                append_saltenv = item[root].get('append_saltenv')
-                if append_saltenv:
-                    # append requested saltenv path to root
-                    root = os.path.join(root,
-                        saltenv if isinstance(append_saltenv, bool)
-                                # replace __env__ with saltenv and append to root
-                                else append_saltenv.replace("__env__", saltenv)
-                    )
-                    log.debug("PillarClient: pillar_roots path append with saltenv to %s", root)
-            else: # item is a list entry
-                root = item
+# {u'x': [u'/sn/git/codebase/dx/pillar'], u'__env__': [u'/sn/git/codebase/__env__/pillar', u'/sn/junk'], u'm': [u'/sn/git/codebase/master/pillar'], u't': [u'/tmp/__env__/pillar']} saltenv: master
+# JRK5 pillar_roots glob_env=__env__
+# JRK5 pillar_roots full=/sn/git/codebase/master/pillar/top.sls
 
-            full = os.path.join(root, path)
-            if os.path.isfile(full):
-                fnd['path'] = full
-                fnd['rel'] = path
-                return fnd
+# {u'x': [u'/sn/git/codebase/dx/pillar'], u'__env__': [u'/sn/git/codebase/__env__/pillar', u'/sn/junk'], u'm': [u'/sn/git/codebase/master/pillar'], u't': [u'/tmp/__env__/pillar']} saltenv: m
+# JRK5 pillar_roots full=/sn/git/codebase/m/pillar/r.sls
+# JRK5 pillar_roots glob_env=__env_
+
+        log.debug("JRK5 pillar _find_file: %s saltenv: %s",self.opts['pillar_roots'],saltenv)
+        for glob_env in globgrep_environments(self.opts['pillar_roots'].keys(),saltenv):
+            log.debug("JRK5 pillar _find_file glob_env=%s pillar_roots=%s",glob_env,self.opts['pillar_roots'][glob_env])
+
+            for root in self.opts['pillar_roots'][glob_env]:
+                root = root.replace("__env__", saltenv)
+                full = os.path.join(root, path)
+                log.debug("JRK5 pillar _find_file root=%s full=%s",root,full)
+
+                if os.path.isfile(full):
+                    fnd['path'] = full
+                    fnd['rel'] = path
+                    log.debug("JRK5 pillar _find_file path %s found: %s", path,full)
+                    return fnd
+
+        log.debug("JRK5 pillar _find_file path %s NOT found", full)
         return fnd
 
     def get_file(self,
@@ -851,6 +859,8 @@ class PillarClient(Client):
         Copies a file from the local files directory into :param:`dest`
         gzip compression settings are ignored for local files
         '''
+        log.debug("JRK5 pillar GET_FILE path: %s saltenv: %s",path,saltenv)
+
         path = self._check_proto(path)
         fnd = self._find_file(path, saltenv)
         fnd_path = fnd.get('path')
@@ -859,24 +869,33 @@ class PillarClient(Client):
 
         return fnd_path
 
-    def file_list(self, saltenv='base', prefix=''):
+    def file_list(self, saltenv='base', prefix='', requested_env=None):
         '''
         Return a list of files in the given environment
         with optional relative prefix path to limit directory traversal
         '''
         ret = []
         prefix = prefix.strip('/')
-        for path in self.opts['pillar_roots'].get(saltenv, []):
-            if isinstance(path, dict):
-                path = path.keys()[0]
-            for root, dirs, files in salt.utils.path.os_walk(
-                os.path.join(path, prefix), followlinks=True
-            ):
-                # Don't walk any directories that match file_ignore_regex or glob
-                dirs[:] = [d for d in dirs if not salt.fileserver.is_file_ignored(self.opts, d)]
-                for fname in files:
-                    relpath = os.path.relpath(os.path.join(root, fname), path)
-                    ret.append(salt.utils.data.decode(relpath))
+        log.debug("JRK file_list saltenv: %s ", saltenv)
+        if requested_env is None :
+            requested_env = saltenv
+
+        pillarenv = self.opts.get('pillarenv','base')
+        for glob_env in globgrep_environments(self.opts['pillar_roots'].keys(),saltenv):
+            for path in self.opts['pillar_roots'][glob_env]:
+                path = path.replace("__env__", requested_env)
+#
+                log.debug("JRK file_list saltenv: %s path: %s", saltenv, path) # HIERZO!
+                for root, dirs, files in salt.utils.path.os_walk(
+                    os.path.join(path, prefix), followlinks=True
+                ):
+                    # Don't walk any directories that match file_ignore_regex or glob
+                    dirs[:] = [d for d in dirs if not salt.fileserver.is_file_ignored(self.opts, d)]
+                    for fname in files:
+                        relpath = os.path.relpath(os.path.join(root, fname), path)
+                        ret.append(salt.utils.data.decode(relpath))
+        log.debug("JRK file_list saltenv: %s ret: %s", saltenv, ret)
+
         return ret
 
     def file_list_emptydirs(self, saltenv='base', prefix=''):
@@ -886,16 +905,15 @@ class PillarClient(Client):
         '''
         ret = []
         prefix = prefix.strip('/')
-        for path in self.opts['pillar_roots'].get(saltenv, []):
-            if isinstance(path, dict):
-                path = path.keys()[0]
-            for root, dirs, files in salt.utils.path.os_walk(
-                os.path.join(path, prefix), followlinks=True
-            ):
-                # Don't walk any directories that match file_ignore_regex or glob
-                dirs[:] = [d for d in dirs if not salt.fileserver.is_file_ignored(self.opts, d)]
-                if not dirs and not files:
-                    ret.append(salt.utils.data.decode(os.path.relpath(root, path)))
+        for glob_env in globgrep_environments(self.opts['pillar_roots'].keys(),saltenv):
+            for path in self.opts['pillar_roots'][glob_env]:
+                for root, dirs, files in salt.utils.path.os_walk(
+                    os.path.join(path, prefix), followlinks=True
+                ):
+                    # Don't walk any directories that match file_ignore_regex or glob
+                    dirs[:] = [d for d in dirs if not salt.fileserver.is_file_ignored(self.opts, d)]
+                    if not dirs and not files:
+                        ret.append(salt.utils.data.decode(os.path.relpath(root, path)))
         return ret
 
     def dir_list(self, saltenv='base', prefix=''):
@@ -905,13 +923,12 @@ class PillarClient(Client):
         '''
         ret = []
         prefix = prefix.strip('/')
-        for path in self.opts['pillar_roots'].get(saltenv, []):
-            if isinstance(path, dict):
-                path = path.keys()[0]
-            for root, dirs, files in salt.utils.path.os_walk(
-                os.path.join(path, prefix), followlinks=True
-            ):
-                ret.append(salt.utils.data.decode(os.path.relpath(root, path)))
+        for glob_env in globgrep_environments(self.opts['pillar_roots'].keys(),saltenv):
+            for path in self.opts['pillar_roots'][glob_env]:
+                for root, dirs, files in salt.utils.path.os_walk(
+                    os.path.join(path, prefix), followlinks=True
+                ):
+                    ret.append(salt.utils.data.decode(os.path.relpath(root, path)))
         return ret
 
     def __get_file_path(self, path, saltenv='base'):
@@ -1436,4 +1453,4 @@ class DumbAuth(object):
 def globgrep_environments(glob_environments,saltenv):
     # glob-style wildcard matching on environments, __env__ for backwards compatibility.
     return [glob_env for glob_env in glob_environments
-                if fnmatch.fnmatch(saltenv,glob_env) or saltenv == '__env__']
+                if fnmatch.fnmatch(saltenv,glob_env) or glob_env == '__env__']
