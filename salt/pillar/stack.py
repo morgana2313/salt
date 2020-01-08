@@ -381,6 +381,7 @@ import glob
 import os
 import posixpath
 import logging
+from fnmatch import fnmatch
 
 from jinja2 import FileSystemLoader, Environment
 
@@ -402,15 +403,26 @@ def ext_pillar(minion_id, pillar, *args, **kwargs):
         'grains': functools.partial(salt.utils.data.traverse_dict_and_list, __grains__),
         'opts': functools.partial(salt.utils.data.traverse_dict_and_list, __opts__),
         }
+    pillarenv = kwargs.pop('pillarenv','base')
     for matcher, matchs in six.iteritems(kwargs):
-        t, matcher = matcher.split(':', 1)
-        if t not in traverse:
-            raise Exception('Unknown traverse option "{0}", '
-                            'should be one of {1}'.format(t, traverse.keys()))
-        cfgs = matchs.get(traverse[t](matcher, None), [])
+        if matcher == 'environment':
+            glob_envs = globgrep_environments(matchs, pillarenv)
+            cfgs = []
+            for glob_env in glob_envs:
+                if  isinstance(matchs[glob_env], list):
+                    cfgs += matchs[glob_env]
+                else:
+                    cfgs += [ matchs[glob_env] ]
+        else:
+            t, matcher = matcher.split(':', 1)
+            if t not in traverse:
+                raise Exception('Unknown traverse option "{0}", '
+                                'should be one of {1}'.format(t, traverse.keys()))
+            cfgs = matchs.get(traverse[t](matcher, None), [])
         if not isinstance(cfgs, list):
             cfgs = [cfgs]
         stack_config_files += cfgs
+    stack_config_files = [c.replace("__env__", pillarenv) for c in stack_config_files]
     for cfg in stack_config_files:
         if not os.path.isfile(cfg):
             log.info(
@@ -537,3 +549,13 @@ def _parse_stack_cfg(content):
     except Exception as e:  # pylint: disable=broad-except
         pass
     return content.splitlines()
+
+
+def globgrep_environments(glob_environments, saltenv):
+    '''
+    Return a list of all environments that match saltenv.
+    Uses glob-style wildcard matching. __env__ matches all for backwards compatibility.
+    '''
+    return [glob_env for glob_env in glob_environments
+                if saltenv is not None and
+                    (fnmatch(saltenv, glob_env) or glob_env == '__env__') ]

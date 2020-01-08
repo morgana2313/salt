@@ -892,33 +892,37 @@ class Pillar(object):
         ext = None
         args = salt.utils.args.get_function_argspec(self.ext_pillars[key]).args
 
+        pillarenv = self.opts.get('pillarenv', 'base')
         if isinstance(val, dict):
             if ('extra_minion_data' in args) and self.extra_minion_data:
                 ext = self.ext_pillars[key](
                     self.minion_id, pillar,
-                    extra_minion_data=self.extra_minion_data, **val)
+                    extra_minion_data=self.extra_minion_data,
+                    pillarenv = pillarenv, **val)
             else:
-                ext = self.ext_pillars[key](self.minion_id, pillar, **val)
+                ext = self.ext_pillars[key](self.minion_id, pillar,
+                    pillarenv = pillarenv, **val)
         elif isinstance(val, list):
             if ('extra_minion_data' in args) and self.extra_minion_data:
                 ext = self.ext_pillars[key](
                     self.minion_id, pillar, *val,
-                    extra_minion_data=self.extra_minion_data)
+                    extra_minion_data = self.extra_minion_data,
+                    pillarenv = pillarenv)
+
             else:
                 ext = self.ext_pillars[key](self.minion_id,
-                                            pillar,
-                                            *val)
+                        pillar, *val, pillarenv = pillarenv)
         else:
             if ('extra_minion_data' in args) and self.extra_minion_data:
                 ext = self.ext_pillars[key](
                     self.minion_id,
                     pillar,
                     val,
-                    extra_minion_data=self.extra_minion_data)
+                    extra_minion_data = self.extra_minion_data,
+                    pillarenv = pillarenv)
             else:
                 ext = self.ext_pillars[key](self.minion_id,
-                                            pillar,
-                                            val)
+                        pillar, val, pillarenv = pillarenv)
         return ext
 
     def ext_pillar(self, pillar, errors=None):
