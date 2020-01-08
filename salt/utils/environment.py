@@ -4,7 +4,7 @@ Environment utilities.
 '''
 from __future__ import absolute_import, print_function, unicode_literals
 import os
-
+from fnmatch import fnmatch
 
 def get_module_environment(env=None, function=None):
     '''
@@ -63,3 +63,12 @@ def get_module_environment(env=None, function=None):
                     section, {}).get(m_name, {}).get(function, {}).copy())
 
     return result
+
+def globgrep_environments(glob_environments, saltenv):
+    '''
+    Return a list of all environments that match saltenv.
+    Uses glob-style wildcard matching. __env__ matches all for backwards compatibility.
+    '''
+    return [glob_env for glob_env in glob_environments
+                if saltenv is not None and
+                    (fnmatch(saltenv, glob_env) or glob_env == '__env__') ]

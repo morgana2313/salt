@@ -35,6 +35,7 @@ import salt.utils.stringutils
 import salt.utils.templates
 import salt.utils.url
 import salt.utils.versions
+from salt.utils.environment import globgrep_environments
 from salt.utils.openstack.swift import SaltSwift
 
 # pylint: disable=no-name-in-module,import-error
@@ -340,13 +341,13 @@ class Client(object):
 
         return ''
 
-    def list_states(self, saltenv):
+    def list_states(self, saltenv, requested_env = None):
         '''
         Return a list of all available sls modules on the master for a given
         environment
         '''
         states = set()
-        for path in self.file_list(saltenv):
+        for path in self.file_list(saltenv, requested_env = requested_env):
             if salt.utils.platform.is_windows():
                 path = path.replace('\\', '/')
             if path.endswith('.sls'):
@@ -819,12 +820,14 @@ class PillarClient(Client):
         if salt.utils.url.is_escaped(path):
             # The path arguments are escaped
             path = salt.utils.url.unescape(path)
-        for root in self.opts['pillar_roots'].get(saltenv, []):
-            full = os.path.join(root, path)
-            if os.path.isfile(full):
-                fnd['path'] = full
-                fnd['rel'] = path
-                return fnd
+        for glob_env in globgrep_environments(self.opts['pillar_roots'].keys(), saltenv):
+            for root in self.opts['pillar_roots'][glob_env]:
+                root = root.replace("__env__", saltenv)
+                full = os.path.join(root, path)
+                if os.path.isfile(full):
+                    fnd['path'] = full
+                    fnd['rel'] = path
+                    return fnd
         return fnd
 
     def get_file(self,
@@ -846,22 +849,28 @@ class PillarClient(Client):
 
         return fnd_path
 
-    def file_list(self, saltenv='base', prefix=''):
+    def file_list(self, saltenv='base', prefix='', requested_env=None):
         '''
         Return a list of files in the given environment
         with optional relative prefix path to limit directory traversal
         '''
         ret = []
         prefix = prefix.strip('/')
-        for path in self.opts['pillar_roots'].get(saltenv, []):
-            for root, dirs, files in salt.utils.path.os_walk(
-                os.path.join(path, prefix), followlinks=True
-            ):
-                # Don't walk any directories that match file_ignore_regex or glob
-                dirs[:] = [d for d in dirs if not salt.fileserver.is_file_ignored(self.opts, d)]
-                for fname in files:
-                    relpath = os.path.relpath(os.path.join(root, fname), path)
-                    ret.append(salt.utils.data.decode(relpath))
+        if requested_env is None :
+            requested_env = saltenv
+
+        pillarenv = self.opts.get('pillarenv','base')
+        for glob_env in globgrep_environments(self.opts['pillar_roots'].keys(), saltenv):
+            for path in self.opts['pillar_roots'][glob_env]:
+                path = path.replace("__env__", requested_env)
+                for root, dirs, files in salt.utils.path.os_walk(
+                    os.path.join(path, prefix), followlinks=True
+                ):
+                    # Don't walk any directories that match file_ignore_regex or glob
+                    dirs[:] = [d for d in dirs if not salt.fileserver.is_file_ignored(self.opts, d)]
+                    for fname in files:
+                        relpath = os.path.relpath(os.path.join(root, fname), path)
+                        ret.append(salt.utils.data.decode(relpath))
         return ret
 
     def file_list_emptydirs(self, saltenv='base', prefix=''):

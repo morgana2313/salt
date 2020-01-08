@@ -14,6 +14,7 @@ import tornado.gen
 import sys
 import traceback
 import inspect
+import fnmatch
 
 # Import salt libs
 import salt.loader
@@ -34,6 +35,7 @@ from salt.version import __version__
 # causes an UnboundLocalError. This should be investigated and fixed, but until
 # then, leave the import directly below this comment intact.
 from salt.utils.dictupdate import merge
+from salt.utils.environment import globgrep_environments
 
 # Import 3rd-party libs
 from salt.ext import six
@@ -451,8 +453,8 @@ class Pillar(object):
         Gather the lists of available sls data from the master
         '''
         avail = {}
-        for saltenv in self._get_envs():
-            avail[saltenv] = self.client.list_states(saltenv)
+        for env in self._get_envs():
+            avail[env] = self.client.list_states(env, requested_env = self.saltenv)
         return avail
 
     def __gen_opts(self, opts_in, grains, saltenv=None, ext=None, pillarenv=None):
@@ -484,15 +486,6 @@ class Pillar(object):
                 opts['ext_pillar'].append(self.ext)
             else:
                 opts['ext_pillar'] = [self.ext]
-        if '__env__' in opts['pillar_roots']:
-            env = opts.get('pillarenv') or opts.get('saltenv') or 'base'
-            if env not in opts['pillar_roots']:
-                log.debug("pillar environment '%s' maps to __env__ pillar_roots directory", env)
-                opts['pillar_roots'][env] = opts['pillar_roots'].pop('__env__')
-            else:
-                log.debug("pillar_roots __env__ ignored (environment '%s' found in pillar_roots)",
-                          env)
-                opts['pillar_roots'].pop('__env__')
         return opts
 
     def _get_envs(self):
@@ -518,7 +511,9 @@ class Pillar(object):
             if self.opts['pillarenv']:
                 # If the specified pillarenv is not present in the available
                 # pillar environments, do not cache the pillar top file.
-                if self.opts['pillarenv'] not in self.opts['pillar_roots']:
+                glob_envs = globgrep_environments(self.opts['pillar_roots'].keys(),
+                    self.opts['pillarenv'])
+                if not glob_envs:
                     log.debug(
                         'pillarenv \'%s\' not found in the configured pillar '
                         'environments (%s)',
@@ -846,14 +841,17 @@ class Pillar(object):
             pstatefiles = []
             mods = set()
             for sls_match in pstates:
-                matched_pstates = []
-                try:
-                    matched_pstates = fnmatch.filter(self.avail[saltenv], sls_match)
-                except KeyError:
+                glob_envs = globgrep_environments(self.opts['pillar_roots'].keys(), saltenv)
+                if not glob_envs:
                     errors.extend(
                         ['No matching pillar environment for environment '
-                         '\'{0}\' found'.format(saltenv)]
+                         '\'{0}\' found in {1}'.format(saltenv, self.avail)]
                     )
+                matched_pstates = [
+                    fn for glob_env in glob_envs \
+                        for fn in fnmatch.filter(self.avail[glob_env], sls_match)
+                ]
+
                 if matched_pstates:
                     pstatefiles.extend(matched_pstates)
                 else:
