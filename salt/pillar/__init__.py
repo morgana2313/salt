@@ -34,6 +34,7 @@ from salt.version import __version__
 # causes an UnboundLocalError. This should be investigated and fixed, but until
 # then, leave the import directly below this comment intact.
 from salt.utils.dictupdate import merge
+from salt.utils.environment import globgrep_environments
 
 # Import 3rd-party libs
 from salt.ext import six
@@ -497,15 +498,16 @@ class Pillar(object):
                 opts['ext_pillar'].append(self.ext)
             else:
                 opts['ext_pillar'] = [self.ext]
-        if '__env__' in opts['pillar_roots']:
-            env = opts.get('pillarenv') or opts.get('saltenv') or 'base'
-            if env not in opts['pillar_roots']:
-                log.debug("pillar environment '%s' maps to __env__ pillar_roots directory", env)
-                opts['pillar_roots'][env] = opts['pillar_roots'].pop('__env__')
-            else:
-                log.debug("pillar_roots __env__ ignored (environment '%s' found in pillar_roots)",
-                          env)
-                opts['pillar_roots'].pop('__env__')
+        pillarenv = opts.get('pillarenv') or opts.get('saltenv') or 'base'
+        #if pillarenv not in opts['pillar_roots']:
+        if '__env__' not in opts['pillar_roots']:
+            log.debug("pillar environment '%s' maps to __env__ pillar_roots directory", env)
+            opts['pillar_roots'][env] = [
+                path.replace("__env__", pillarenv) for path in opts['pillar_roots'].pop('__env__')]
+        else:
+            log.debug("pillar_roots __env__ ignored (environment '%s' found in pillar_roots)",
+                      pillarenv)
+            opts['pillar_roots'].pop('__env__')
         return opts
 
     def _get_envs(self):

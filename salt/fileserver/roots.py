@@ -32,6 +32,8 @@ import salt.utils.path
 import salt.utils.platform
 import salt.utils.stringutils
 import salt.utils.versions
+from salt.utils.environment import globgrep_environments
+
 from salt.ext import six
 
 log = logging.getLogger(__name__)
