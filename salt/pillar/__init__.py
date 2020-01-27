@@ -499,15 +499,14 @@ class Pillar(object):
             else:
                 opts['ext_pillar'] = [self.ext]
         pillarenv = opts.get('pillarenv') or opts.get('saltenv') or 'base'
-        #if pillarenv not in opts['pillar_roots']:
-        if '__env__' not in opts['pillar_roots']:
-            log.debug("pillar environment '%s' maps to __env__ pillar_roots directory", env)
-            opts['pillar_roots'][env] = [
-                path.replace("__env__", pillarenv) for path in opts['pillar_roots'].pop('__env__')]
-        else:
-            log.debug("pillar_roots __env__ ignored (environment '%s' found in pillar_roots)",
-                      pillarenv)
-            opts['pillar_roots'].pop('__env__')
+        if pillarenv not in opts['pillar_roots']:
+            # not found? try (first) wildcard expansion:
+            found = globgrep_environments(opts['pillar_roots'].keys(), pillarenv)
+            if found:
+                found = found[0] # first match
+                log.debug("JRK pillar_roots '%s' matches saltenv '%s'", found,pillarenv)
+                opts['pillar_roots'][pillarenv] = [
+                    path.replace("__env__", pillarenv) for path in opts['pillar_roots'].pop(found)]
         return opts
 
     def _get_envs(self):

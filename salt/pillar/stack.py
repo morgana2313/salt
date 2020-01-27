@@ -409,10 +409,9 @@ def ext_pillar(minion_id, pillar, *args, **kwargs):
         log.debug('JRK ext_pillar matcher=%s matchs=%s',matcher, matchs)
         if matcher == 'pillarenv':
             cfgs = []
-            if pillarenv in matchs:
-                for glob_env in globgrep_environments(matchs, pillarenv):
-                    cfgs += matchs[glob_env] if isinstance(matchs[glob_env], list) \
-                                             else [matchs[glob_env]]
+            for glob_env in globgrep_environments(matchs, pillarenv):
+                cfgs += matchs[glob_env] if isinstance(matchs[glob_env], list) \
+                                         else [matchs[glob_env]]
         else:
             t, matcher = matcher.split(':', 1)
             if t not in traverse:
