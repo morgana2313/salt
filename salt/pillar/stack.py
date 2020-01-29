@@ -15,11 +15,12 @@ https://github.com/bbinet/pillarstack/issues
 It supports the following features:
 
 - multiple config files that are jinja2 templates with support for ``pillar``,
-  ``__grains__``, ``__salt__``, ``__opts__`` objects
+  ``__grains__``, ``__salt__``, ``__opts__`` objects and ``pillarenv``
 - a config file renders as an ordered list of files (paths of these files are
   relative to the current config file)
 - this list of files are read in ordered as jinja2 templates with support for
   ``stack``, ``pillar``, ``__grains__``, ``__salt__``, ``__opts__`` objects
+  and ``pillarenv``
 - all these rendered files are then parsed as ``yaml``
 - then all yaml dicts are merged in order with support for the following
   merging strategies: ``merge-first``, ``merge-last``, ``remove``, and
@@ -87,7 +88,10 @@ Here is an example of such a configuration, which should speak by itself:
 
     ext_pillar:
       - stack:
-          pillar:environment:
+          pillarenv:
+            dev*: /path/to/dev/stack.cfg
+            *: /path/to/__env__/stack.cfg
+          pillar:some_param:
             dev: /path/to/dev/stack.cfg
             prod: /path/to/prod/stack.cfg
           grains:custom:grain:
@@ -389,6 +393,7 @@ from salt.ext import six
 import salt.utils.data
 import salt.utils.jinja
 import salt.utils.yaml
+from salt.utils.environment import globgrep_environments
 
 log = logging.getLogger(__name__)
 strategies = ('overwrite', 'merge-first', 'merge-last', 'remove')
@@ -397,20 +402,27 @@ strategies = ('overwrite', 'merge-first', 'merge-last', 'remove')
 def ext_pillar(minion_id, pillar, *args, **kwargs):
     stack = {}
     stack_config_files = list(args)
+    pillarenv = __opts__['pillarenv'] or 'base'
     traverse = {
         'pillar': functools.partial(salt.utils.data.traverse_dict_and_list, pillar),
         'grains': functools.partial(salt.utils.data.traverse_dict_and_list, __grains__),
         'opts': functools.partial(salt.utils.data.traverse_dict_and_list, __opts__),
         }
     for matcher, matchs in six.iteritems(kwargs):
-        t, matcher = matcher.split(':', 1)
-        if t not in traverse:
-            raise Exception('Unknown traverse option "{0}", '
-                            'should be one of {1}'.format(t, traverse.keys()))
-        cfgs = matchs.get(traverse[t](matcher, None), [])
+        if matcher == 'pillarenv':
+            cfgs = []
+            for glob_env in globgrep_environments(matchs, pillarenv):
+                cfgs += matchs[glob_env] if isinstance(matchs[glob_env], list) \
+                                         else [matchs[glob_env]]
+        else:
+            t, matcher = matcher.split(':', 1)
+            if t not in traverse:
+                raise Exception('Unknown traverse option "{0}", '
+                                'should be one of {1}'.format(t, traverse.keys()))
+            cfgs = matchs.get(traverse[t](matcher, None), [])
         if not isinstance(cfgs, list):
             cfgs = [cfgs]
-        stack_config_files += cfgs
+        stack_config_files += [cfg.replace("__env__", pillarenv) for cfg in cfgs]
     for cfg in stack_config_files:
         if not os.path.isfile(cfg):
             log.info(
@@ -438,6 +450,7 @@ def _process_stack_cfg(cfg, stack, minion_id, pillar):
             },
         "minion_id": minion_id,
         "pillar": pillar,
+        "pillarenv":  __opts__['pillarenv']
         })
     for item in _parse_stack_cfg(
             jenv.get_template(filename).render(stack=stack)):
