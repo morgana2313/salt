@@ -2186,7 +2186,7 @@ def pkg(pkg_path,
         full = os.path.join(root, fn_)
         if not os.path.isdir(full):
             continue
-        popts['file_roots'][fn_] = [full]
+        popts['file_roots'][fn_] = [full] # todo JRK: globgrep + replace __env__
     st_ = salt.state.State(popts, pillar_override=pillar_override)
     snapper_pre = _snapper_pre(popts, kwargs.get('__pub_jid', 'called localy'))
     ret = st_.call_chunks(lowstate)

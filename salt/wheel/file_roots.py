@@ -21,9 +21,9 @@ def find(path, saltenv='base'):
     '''
     # Return a list of paths + text or bin
     ret = []
-    if saltenv not in __opts__['file_roots']:
+    if saltenv not in __opts__['file_roots']: # todo JRK: globgrep + replace __env__
         return ret
-    for root in __opts__['file_roots'][saltenv]:
+    for root in __opts__['file_roots'][saltenv]: # todo JRK: globgrep + replace __env__
         full = os.path.join(root, path)
         if os.path.isfile(full):
             # Add it to the dict
@@ -40,9 +40,9 @@ def list_env(saltenv='base'):
     Return all of the file paths found in an environment
     '''
     ret = {}
-    if saltenv not in __opts__['file_roots']:
+    if saltenv not in __opts__['file_roots']: # todo JRK: globgrep + replace __env__
         return ret
-    for f_root in __opts__['file_roots'][saltenv]:
+    for f_root in __opts__['file_roots'][saltenv]: # todo JRK: globgrep + replace __env__
         ret[f_root] = {}
         for root, dirs, files in salt.utils.path.os_walk(f_root):
             sub = ret[f_root]
@@ -70,7 +70,7 @@ def list_roots():
     Return all of the files names in all available environments
     '''
     ret = {}
-    for saltenv in __opts__['file_roots']:
+    for saltenv in __opts__['file_roots']: # # todo JRK: globgrep + replace __env__
         ret[saltenv] = []
         ret[saltenv].append(list_env(saltenv))
     return ret
@@ -99,15 +99,15 @@ def write(data, path, saltenv='base', index=0):
     Write the named file, by default the first file found is written, but the
     index of the file can be specified to write to a lower priority file root
     '''
-    if saltenv not in __opts__['file_roots']:
+    if saltenv not in __opts__['file_roots']: # todo JRK: globgrep + replace __env__
         return 'Named environment {0} is not present'.format(saltenv)
-    if len(__opts__['file_roots'][saltenv]) <= index:
+    if len(__opts__['file_roots'][saltenv]) <= index: # todo JRK: globgrep + replace __env__
         return 'Specified index {0} in environment {1} is not present'.format(
                 index, saltenv)
     if os.path.isabs(path):
         return ('The path passed in {0} is not relative to the environment '
                 '{1}').format(path, saltenv)
-    dest = os.path.join(__opts__['file_roots'][saltenv][index], path)
+    dest = os.path.join(__opts__['file_roots'][saltenv][index], path) # todo JRK: globgrep + replace __env__
     dest_dir = os.path.dirname(dest)
     if not os.path.isdir(dest_dir):
         os.makedirs(dest_dir)

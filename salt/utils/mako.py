@@ -86,7 +86,7 @@ if HAS_MAKO:
             else:
                 proto = "salt://"
                 if self.opts['file_client'] == 'local':
-                    searchpath = self.opts['file_roots'][self.saltenv]
+                    searchpath = self.opts['file_roots'][self.saltenv] # todo JRK: globgrep + replace __env__
                 else:
                     searchpath = [os.path.join(self.opts['cachedir'],
                                                'files',
