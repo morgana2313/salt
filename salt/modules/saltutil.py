@@ -1768,10 +1768,15 @@ class _MMinion(object):
             # context
             m.opts['grains'] = grains
 
-            env_roots = m.opts['file_roots'][saltenv]
-            m.opts['module_dirs'] = [fp + '/_modules' for fp in env_roots]
-            m.gen_modules()
-            _mminions[saltenv] = m
+            glob_envs = globgrep_environments(m.opts['file_roots'].keys(), saltenv)
+            if glob_envs:
+                m.opts['module_dirs'] = [
+                    fp.replace("__env__", saltenv) + '/_modules'
+                    # [0]: only first matching environment
+                    for fp in m.opts['file_roots'][glob_envs[0]]:
+                ]
+                m.gen_modules()
+                _mminions[saltenv] = m
         return _mminions[saltenv]
 
 
