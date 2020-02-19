@@ -90,7 +90,7 @@ Here is an example of such a configuration, which should speak by itself:
       - stack:
           pillarenv:
             dev*: /path/to/dev/stack.cfg
-            *: /path/to/__env__/stack.cfg
+            '*': /path/to/__env__/stack.cfg
           pillar:some_param:
             dev: /path/to/dev/stack.cfg
             prod: /path/to/prod/stack.cfg

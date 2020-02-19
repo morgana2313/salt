@@ -83,7 +83,7 @@ def find_file(path, saltenv='base', **kwargs):
 
     if 'index' in kwargs:
         try:
-            root = __opts__['file_roots'][saltenv][int(kwargs['index'])]
+            root = __opts__['file_roots'][saltenv][int(kwargs['index'])] # JRK glob_envs!
         except IndexError:
             # An invalid index was passed
             return fnd
@@ -112,7 +112,7 @@ def envs():
     '''
     Return the file server environments
     '''
-    return sorted(__opts__['file_roots'])
+    return sorted(__opts__['file_roots']) # JRK glob_envs!
 
 
 def serve_file(load, fnd):
@@ -162,7 +162,7 @@ def update():
             'backend': 'roots'}
 
     # generate the new map
-    new_mtime_map = salt.fileserver.generate_mtime_map(__opts__, __opts__['file_roots'])
+    new_mtime_map = salt.fileserver.generate_mtime_map(__opts__, __opts__['file_roots']) # JRK: glob_envs
 
     old_mtime_map = {}
     # if you have an old map, load that
@@ -313,6 +313,7 @@ def _file_lists(load, form):
             log.critical('Unable to make cachedir %s', list_cachedir)
             return []
     list_cache = os.path.join(list_cachedir, '{0}.p'.format(salt.utils.files.safe_filename_leaf(saltenv)))
+
     w_lock = os.path.join(list_cachedir, '.{0}.w'.format(salt.utils.files.safe_filename_leaf(saltenv)))
     cache_match, refresh_cache, save_cache = \
         salt.fileserver.check_file_list_cache(
@@ -401,6 +402,7 @@ def _file_lists(load, form):
 
         for glob_env in glob_envs:
             for path in __opts__['file_roots'][glob_env]:
+                path = path.replace("__env__", saltenv)
                 for root, dirs, files in salt.utils.path.os_walk(
                         path,
                         followlinks=__opts__['fileserver_followsymlinks']):

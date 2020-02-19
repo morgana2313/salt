@@ -1770,10 +1770,11 @@ class _MMinion(object):
 
             glob_envs = globgrep_environments(m.opts['file_roots'].keys(), saltenv)
             if glob_envs:
+                log.debug('JRK glob_envs: %s',glob_envs)
                 m.opts['module_dirs'] = [
                     fp.replace("__env__", saltenv) + '/_modules'
-                    # [0]: only first matching environment
-                    for fp in m.opts['file_roots'][glob_envs[0]]:
+                        # [0]: only first matching environment
+                        for fp in m.opts['file_roots'][glob_envs[0]]
                 ]
                 m.gen_modules()
                 _mminions[saltenv] = m
