@@ -2943,8 +2943,8 @@ class BaseHighState(object):
         Gather the lists of available sls data from the master
         '''
         avail = {}
-        for saltenv in self._get_envs():
-            avail[saltenv] = self.client.list_states(saltenv)
+        for env in self._get_envs():
+            avail[env] = self.client.list_states(env)
         return avail
 
     def __gen_opts(self, opts):
@@ -2999,14 +2999,23 @@ class BaseHighState(object):
         Pull the file server environments out of the master options
         '''
         envs = ['base']
+        saltenv = self.opts['saltenv']
         if 'file_roots' in self.opts:
-            envs.extend([x for x in list(self.opts['file_roots'])
-                         if x not in envs])
+            # glob-style wildcard matching of environments. __env__ matches all for backwards compatibility.
+            envs.extend([y for y in
+                            [x if x != '__env__' and not fnmatch.fnmatch(saltenv, x) else saltenv
+                                for x in list(self.opts['file_roots'])]
+                         if y not in envs])
+
         env_order = self.opts.get('env_order', [])
         # Remove duplicates while preserving the order
         members = set()
         env_order = [env for env in env_order if not (env in members or members.add(env))]
-        client_envs = self.client.envs()
+
+        # glob-style wildcard matching of environments. __env__ matches all for backwards compatibility.
+        client_envs = [saltenv if env == '__env__' or fnmatch.fnmatch(saltenv, env) else env
+                        for env in self.client.envs()]
+
         if env_order and client_envs:
             return [env for env in env_order if env in client_envs]
 

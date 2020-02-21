@@ -83,7 +83,7 @@ def find_file(path, saltenv='base', **kwargs):
 
     if 'index' in kwargs:
         try:
-            root = __opts__['file_roots'][saltenv][int(kwargs['index'])] # JRK glob_envs!
+            root = __opts__['file_roots'][glob_envs[0]][int(kwargs['index'])]
         except IndexError:
             # An invalid index was passed
             return fnd
@@ -112,7 +112,8 @@ def envs():
     '''
     Return the file server environments
     '''
-    return sorted(__opts__['file_roots']) # JRK glob_envs!
+    # glob_envs cannot be handled here, coz saltenv unknow.
+    return sorted(__opts__['file_roots'])
 
 
 def serve_file(load, fnd):
